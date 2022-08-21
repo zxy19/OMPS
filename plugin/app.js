@@ -3,7 +3,7 @@
 // @namespace    https://xypp.cc/omps/
 // @updateURL    https://xypp.cc/omps/app.js
 // @downloadURL  https://xypp.cc/omps/app.js
-// @version      4.1
+// @version      4.3
 // @description  OMPS多人在线同播。脚本默认对所有站点均生效。您可以在TamperMonkey=>管理面板=>OMPS多人在线同播=>设置=>用户排除中修改不想要生效的网站或直接修改源代码
 // @author       小鱼飘飘
 // @match        *://*/*
@@ -17,9 +17,9 @@
 (function () {
     'use strict';
     //为非油猴的直接运行方式优化
-    var GM_window,GM_get,GM_set;
+    var GM_window, GM_get, GM_set;
     if (typeof unsafeWindow != 'object') GM_window = window;
-    else GM_window=unsafeWindow;
+    else GM_window = unsafeWindow;
     if (typeof GM_getValue != 'function') {
         GM_get = function (key, val) {
             return GM_window.localStorage.getItem(key) || val;
@@ -27,9 +27,9 @@
         GM_set = function (key, val) {
             return GM_window.localStorage.setItem(key, val);
         };
-    }else{
-        GM_get=GM_getValue;
-        GM_set=GM_setValue;
+    } else {
+        GM_get = GM_getValue;
+        GM_set = GM_setValue;
     }
     document.body.setAttribute("data-omps-injected", "true");
     const URL = "wss://public.xypp.cc:8093";
@@ -75,7 +75,8 @@
         sync: "同步",
         call: "集合",
         unsync: ["失去同步！您可以同步至", "的最快进度(", "s)或者呼叫其他用户集合"],
-        unsync_top: "失去同步！您是目前的最快进度，您可以呼叫其他用户集合"
+        unsync_top: "失去同步！您是目前的最快进度，您可以呼叫其他用户集合",
+        videoChange: "视频变更，准备重连"
     }
 
 
@@ -96,7 +97,7 @@
     var openedSettingPanel;
     //[函数]打开设置面板
     function openSettingPanel() {
-        if (openedSettingPanel){
+        if (openedSettingPanel) {
             closeSettingPanel();
         }
         var el = document.createElement("div");
@@ -104,7 +105,7 @@
         el.id = "omps-config";
         el.innerHTML = msgMaker.settingPanel();
         document.body.appendChild(el);
-        openedSettingPanel=el;
+        openedSettingPanel = el;
     }
     function saveSettings() {
         var el = document.getElementById("omps-config");
@@ -228,6 +229,8 @@
     function detecVideoCode() {
         if (!initFinish) return;
         if (getVideoCode() != videoCode) {
+            showToast(lang.videoChange,1,1);
+            videoCode = getVideoCode();
             initFinish = false;
             showTip();
         } else setTimeout(detecVideoCode, 5000);
