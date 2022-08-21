@@ -1,0 +1,14 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "multi player online player sync keep server",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "小鱼飘飘",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.8.1"
+  }
+}
