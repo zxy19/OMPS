@@ -1,14 +1,14 @@
 const { WebSocketServer } = require('ws');
 const { createServer } = require('https');
 const { readFileSync } = require('fs');
-
+const port = 8093;
 
 //连接管理部分
 //该部分控制Websocket的连接和消息事件，以及在关闭连接时释放资源
 const server = createServer({
     cert: readFileSync(__dirname + '/fullchain.pem'),
     key: readFileSync(__dirname + '/privkey.pem')
-}).listen(8093);
+}).listen(port);
 wss = new WebSocketServer({ server });
 var connectIds = {}, connectUser = {}, userConnect = {}, connectCount = 0;
 wss.on('connection', function connection(ws) {
