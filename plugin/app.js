@@ -3,7 +3,7 @@
 // @namespace    https://xypp.cc/omps/
 // @updateURL    https://xypp.cc/omps/app.js
 // @downloadURL  https://xypp.cc/omps/app.js
-// @version      4.3
+// @version      6.0
 // @description  OMPS多人在线同播。脚本默认对所有站点均生效。您可以在TamperMonkey=>管理面板=>OMPS多人在线同播=>设置=>用户排除中修改不想要生效的网站或直接修改源代码
 // @author       小鱼飘飘
 // @match        *://*/*
@@ -31,15 +31,23 @@
         GM_get = GM_getValue;
         GM_set = GM_setValue;
     }
-    document.body.setAttribute("data-omps-injected", "true");
     const URL = "wss://public.xypp.cc:8093";
+    try {
+        document.body.setAttribute("data-omps-injected", "true");
+    } catch (e) { }
+    function getTextSafe(text) {
+        var tmpElement = document.createElement("div");
+        if (tmpElement.textContent !== null) tmpElement.textContent = text;
+        else tmpElement.innerText = text;
 
-
+        var retText = tmpElement.innerHTML;
+        return retText;
+    }
     var ws;
     var video;
-
-    var initFinish = false, lastTime = -1, pauseAt, globalCount = 24, toastCnt = 0, tmpLocalDelay, localDelay, initTime, videoCode = "", HASH = {};
-    const css = `.omps-tip{position:absolute;top:100px;height:40px;border-radius:0 40px 40px 0;left:-300px;background-color:rgba(0,0,0,0.772);padding-left:10px;line-height:35px;color:white;max-width:100%;z-index:10000000;transition:all 1s;opacity:0}.omps-tip.open{left:0;opacity:1}.omps-tip div{display:inline;font-size: 20px;}.omps-tip .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 7px;margin-right:6px;line-height:13px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-tip .btn svg{height:20px;width:20px}.omps-tip .btn svg path{fill:black;}.omps-tip .btn:hover{background-color:#dcdcdc}.omps-tip .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-tip .btn span{display:none}.omps-tip .btn:hover span{animation:showLabelAnim 1s linear 1s 1;animation-fill-mode:forwards;max-width:0;overflow-x:hidden;word-break:keep-all;margin:0;display:unset;padding:0;line-height:20px;overflow-y:clip;float:right}@keyframes showLabelAnim{0%{max-width:0}100%{max-width:200px}}.omps-config{z-index: 100000;max-width: calc(100% - 100px);position:absolute;top:50px;width:600px;left:50px;background-color:rgba(0,0,0,0.772);border-radius:10px;color:white;padding:20px}.omps-config input{display:block;outline:0;border:0;border-radius:5px;color:black;background-color: rgba(255,255,255,0.772);}.omps-config input:active{box-shadow:skyblue 0 0 5px 3px}.omps-config input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-config input.i{height:30px;width:300px;max-width: 100%;}.omps-config input.c{height:20px;width:20px}.omps-config label{display:block;text-decoration:underline}.omps-config small{display:block;color:lightgray}.omps-config .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-config .btn:hover{background-color:#dcdcdc}.omps-config .btn:active{box-shadow:inset gray 1px 1px 1px}`;
+    var trustKey = GM_get("trust", "none");
+    var initFinish = false, lastTime = -1, pauseAt, globalCount = 24, toastCnt = 0, tmpLocalDelay, localDelay, initTime, videoCode = "", HASH = {}, videoTitle = "", videoUrl = "";
+    const css = `.omps-friend{position:absolute;top:140px;left:0}.omps-friend .item{height:30px;border-radius:0 40px 40px 0;background-color:rgba(0,0,0,0.772);padding-left:10px;padding-right:5px;line-height:25px;font-size:15px;color:white;max-width:300px;margin-top:3px}.omps-friend .item.offline{opacity:.5;text-decoration:line-through}.omps-tip{position:absolute;top:100px;height:40px;border-radius:0 40px 40px 0;left:-300px;background-color:rgba(0,0,0,0.772);padding-left:10px;line-height:35px;color:white;max-width:100%;z-index:10000000;transition:all 1s;opacity:0}.omps-tip.open{left:0;opacity:1}.omps-tip div{display:inline;font-size:20px}.omps-tip .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 7px;margin-right:6px;line-height:13px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-tip .btn svg,.omps-chat-input svg,.omps-chat svg,.omps-friend svg{height:20px;width:20px}.omps-tip .btn svg path{fill:black}.omps-tip .btn:hover{background-color:#dcdcdc}.omps-tip .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-tip .btn span{display:none}.omps-tip .btn:hover span{animation:showLabelAnim 1s linear 1s 1;animation-fill-mode:forwards;max-width:0;overflow-x:hidden;word-break:keep-all;margin:0;display:unset;padding:0;line-height:20px;overflow-y:clip;float:right}@keyframes showLabelAnim{0%{max-width:0}100%{max-width:200px}}.omps-config{font-size:18px;z-index:10000003;max-width:calc(100% - 100px);position:absolute;top:50px;width:600px;left:50px;background-color:rgba(0,0,0,0.772);border-radius:10px;color:white;padding:20px;max-height:calc(100% - 100px);overflow:auto}.omps-config input{display:block;outline:0;border:0;border-radius:5px;color:black;background-color:rgba(255,255,255,0.772)}.omps-config input:active{box-shadow:skyblue 0 0 5px 3px}.omps-config input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-config input.i{height:30px;width:300px;max-width:100%}.omps-config input.c{height:20px;width:20px;-webkit-appearance:checkbox!important;appearance:checkbox!important}.omps-config label{display:block;text-decoration:underline}.omps-config small{display:block;color:lightgray}.omps-config .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-config .btn:hover{background-color:#dcdcdc}.omps-config .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-chat{font-size:18px;position:absolute;top:5px;right:0;overflow-x:hidden;max-width:100%;width:400px}.omps-chat .item{border-radius:40px 0 0 40px;background-color:rgba(0,0,0,0.772);color:white;max-width:calc(100% - 30px);z-index:10000000;transition:all 1s;opacity:0;transform:translateX(100%);position:relative;margin-top:2px;max-height:0;line-break:loose;word-break:break-all;white-space:normal;overflow:hidden}.omps-chat .item.open{transform:translateX(0%);opacity:1;max-height:400px;padding:10px}.omps-chat .item .name{text-decoration:underline;font-weight:bold}.omps-chat .item .delay{font-size:x-small;font-style:italic;position:absolute;top:1px;right:1px}.omps-chat-input{position:absolute;bottom:50px;right:100px;width:calc(100% - 200px);background-color:rgba(0,0,0,0.772);height:40px}.omps-chat-input{font-size:18px;position:absolute;bottom:150px;right:100px;width:calc(100% - 200px);background-color:rgba(0,0,0,0.772);border-radius:50px;padding:10px 30px;opacity:0;transition:all .5s}.omps-chat-input.tipPos{animation:omps-tipPos 1s ease-in-out 0s infinite}.omps-chat-input:hover,.omps-chat-input.inputActive{opacity:1}@keyframes omps-tipPos{0%{opacity:0}50%{opacity:.5}100%{opacity:0}}.omps-chat-input input{background-color:rgba(0,0,0,0);display:inline-block;outline:0;border:rgba(255,255,255,0.497) 1px solid;border-radius:5px;width:calc(100% - 100px);height:100%;color:white}.omps-chat-input input:active{box-shadow:skyblue 0 0 5px 3px}.omps-chat-input input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-chat-input .btn,.omps-chat .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-chat-input .btn svg path,.omps-chat .btn svg path{fill:black}.omps-chat-input .btn:hover,.omps-chat .btn:hover{background-color:#dcdcdc}.omps-chat-input .btn:active,.omps-chat .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-chat .btn{padding: 2px 5px;font-size: 16px;}`;
     const lang = {
         join: "检测到视频，点击进入联机放映",
         reconfigure: "重新填写配置",
@@ -62,6 +70,19 @@
                 label: "静默模式",
                 tip: "仅会提示您失去同步消息，不会提示您成功消息"
             },
+            friend: {
+                label: "显示好友",
+                tip: "在窗口左侧显示一个好友列表，展示您和好友的进度"
+            },
+            showMsgIpt: {
+                label: "显示消息输入框",
+                tip: "在视频下方中央显示一个输入框，这将您允许发送消息"
+            },
+            hideMsg: {
+                label: "隐藏消息",
+                tip: "隐藏消息，不显示别人发送的消息。注意，打开此功能后，显示消息输入框功能将失效。"
+            },
+
             saveExit: "保存并关闭",
             saveJoin: "保存并连接"
         },
@@ -74,9 +95,15 @@
         playerJoin: "加入了放映厅",
         sync: "同步",
         call: "集合",
+        sendmsg: "发送",
         unsync: ["失去同步！您可以同步至", "的最快进度(", "s)或者呼叫其他用户集合"],
         unsync_top: "失去同步！您是目前的最快进度，您可以呼叫其他用户集合",
-        videoChange: "视频变更，准备重连"
+        videoChange: "视频变更，准备重连",
+        dumplName: "注册失败，与服务器中已连接的用户重名",
+        secondConnect: "因为您的另一个客户端的连接，本页面已与服务器断开连接",
+        tiper:"提示",
+        jumpTip:["用户[","]从此视频转向观看‘","’","点击前往"],
+        jumpConfirm:["您即将前往","跳转到目标网站可能会带来不明的风险，您确定要跳转吗？"]
     }
 
 
@@ -85,7 +112,10 @@
         autoJoin: "",
         userId: parseInt(Math.random() * 10000),
         group: "",
-        silent: ""
+        silent: "",
+        friend: "",
+        showMsgIpt: "",
+        hideMsg: ""
     };
     //导入设置（TamporMonkey/LocalStorage）
     for (const settingItem in setting) {
@@ -103,6 +133,7 @@
         var el = document.createElement("div");
         el.className = "omps-config";
         el.id = "omps-config";
+        el.onclick = noPop
         el.innerHTML = msgMaker.settingPanel();
         document.body.appendChild(el);
         openedSettingPanel = el;
@@ -114,10 +145,16 @@
         GM_set("group", document.getElementById("omps-input-group").value);
         GM_set("autoJoin", document.getElementById("omps-input-quick").checked ? "1" : "");
         GM_set("silent", document.getElementById("omps-input-silent").checked ? "1" : "");
+        GM_set("friend", document.getElementById("omps-input-friend").checked ? "1" : "");
+        GM_set("showMsgIpt", document.getElementById("omps-input-showMsgIpt").checked ? "1" : "");
+        GM_set("hideMsg", document.getElementById("omps-input-hideMsg").checked ? "1" : "");
         setting.userId = document.getElementById("omps-input-name").value;
         setting.group = document.getElementById("omps-input-group").value;
         setting.autoJoin = document.getElementById("omps-input-quick").checked ? "1" : "";
         setting.silent = document.getElementById("omps-input-silent").checked ? "1" : "";
+        setting.friend = document.getElementById("omps-input-friend").checked ? "1" : "";
+        setting.showMsgIpt = document.getElementById("omps-input-showMsgIpt").checked ? "1" : "";
+        setting.hideMsg = document.getElementById("omps-input-hideMsg").checked ? "1" : "";
     }
     function closeSettingPanel() {
         var el = openedSettingPanel;
@@ -146,6 +183,18 @@
             <label>${lang.setting.silent.label}</label>
             <small>${lang.setting.silent.tip}</small>
             <input class="omps-input c" type="checkbox" id="omps-input-silent" ${setting.silent ? "checked" : ""}>
+            <br>
+            <label>${lang.setting.friend.label}</label>
+            <small>${lang.setting.friend.tip}</small>
+            <input class="omps-input c" type="checkbox" id="omps-input-friend" ${setting.silent ? "checked" : ""}>
+            <br>
+            <label>${lang.setting.showMsgIpt.label}</label>
+            <small>${lang.setting.showMsgIpt.tip}</small>
+            <input class="omps-input c" type="checkbox" id="omps-input-showMsgIpt" ${setting.showMsgIpt ? "checked" : ""}>
+            <br>
+            <label>${lang.setting.hideMsg.label}</label>
+            <small>${lang.setting.hideMsg.tip}</small>
+            <input class="omps-input c" type="checkbox" id="omps-input-hideMsg" ${setting.hideMsg ? "checked" : ""}>
             <br><br>
             <a class="btn" onclick="ompsEventRouter('saveExit');return false;">${lang.setting.saveExit}</a>
             <a class="btn" onclick="ompsEventRouter('saveLink');return false;">${lang.setting.saveJoin}</a>
@@ -168,7 +217,7 @@
             `;
         },
         success: (code, delv) => {
-            return `${lang.success}${delv}
+            return `${lang.success}${getTextSafe(delv)}
                 <a class="btn" onclick="ompsEventRouter('config');return false;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black"class="bi bi-gear-fill" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z" /></svg>
                 <span class="desc">${lang.reconfigure}</span>
@@ -189,16 +238,16 @@
             return `${lang.playFail}`;
         },
         delayTip: (delv) => {
-            return `${lang.delay[0]}${delv}${lang.delay[1]}`;
+            return `${lang.delay[0]}${getTextSafe(delv)}${lang.delay[1]}`;
         },
         syncSuccess: () => {
             return lang.syncSuccess;
         },
         playerJoin: (pname) => {
-            return `${pname}${lang.playerJoin}`;
+            return `${getTextSafe(pname)}${lang.playerJoin}`;
         },
         unsync: (target, deltaTime) => {
-            return `${lang.unsync[0]}${target}${lang.unsync[1]}${deltaTime}${lang.unsync[2]}
+            return `${lang.unsync[0]}${getTextSafe(target)}${lang.unsync[1]}${getTextSafe(deltaTime)}${lang.unsync[2]}
             <a class=\"btn\" onclick=\"ompsEventRouter('sync');return false;\">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
             <span class="desc">${lang.sync}</span>
@@ -214,6 +263,88 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-flag-fill" viewBox="0 0 16 16"><path d="M14.778.085A.5.5 0 0 1 15 .5V8a.5.5 0 0 1-.314.464L14.5 8l.186.464-.003.001-.006.003-.023.009a12.435 12.435 0 0 1-.397.15c-.264.095-.631.223-1.047.35-.816.252-1.879.523-2.71.523-.847 0-1.548-.28-2.158-.525l-.028-.01C7.68 8.71 7.14 8.5 6.5 8.5c-.7 0-1.638.23-2.437.477A19.626 19.626 0 0 0 3 9.342V15.5a.5.5 0 0 1-1 0V.5a.5.5 0 0 1 1 0v.282c.226-.079.496-.17.79-.26C4.606.272 5.67 0 6.5 0c.84 0 1.524.277 2.121.519l.043.018C9.286.788 9.828 1 10.5 1c.7 0 1.638-.23 2.437-.477a19.587 19.587 0 0 0 1.349-.476l.019-.007.004-.002h.001"/></svg>
             <span class="desc">${lang.call}</span>
             </a>`
+        },
+        chat_input: () => {
+            return `
+                <input class="omps-input i" id="omps-input-chatmsg" onblur="this.parentNode.classList.remove('inputActive')"
+                    onfocus="this.parentNode.classList.add('inputActive')" onkeydown="if(event.keyCode == 13){ompsEventRouter('sendMsg');omps_noPop(event);}"
+                    onclick="noPop(event)" autocomplete="off">
+                <a class="btn" onclick="ompsEventRouter('sendMsg');omps_noPop(event)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black"
+                        class="bi bi-arrow-right-circle-fill" viewBox="0 0 16 16">
+                        <path
+                            d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z" />
+                    </svg>
+                    <span class="desc">${lang.sendmsg}</span>
+                </a>
+            `;
+        },
+        chat_block: (name, msg, time) => {
+            return `
+                <span class="name">${getTextSafe(name)}</span>
+                &nbsp;:&nbsp;
+                <span>${getTextSafe(msg)}</span>
+                <span class="delay">${time}</span>
+            `;
+        },
+        error: (msg) => {
+            if (msg == "E_USERNAME_DUMPL") {
+                return `
+                ${lang.dumplName}
+                <a class="btn" onclick="ompsEventRouter('config');return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black"class="bi bi-gear-fill" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z" /></svg>
+                    <span class="desc">${lang.reconfigure}</span>
+                </a>
+                <a class="btn" onclick="ompsEventRouter('hide');return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black" class="bi bi-x" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                    <span class="desc">${lang.quit}</span>
+                </a>`;
+            } else if (msg == "E_SECOND_CONN") {
+                return `${lang.secondConnect}
+                <a class="btn" onclick="ompsEventRouter('config');return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black"class="bi bi-gear-fill" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z" /></svg>
+                    <span class="desc">${lang.reconfigure}</span>
+                </a>
+                <a class="btn"onclick="ompsEventRouter('create');return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black" class="bi bi-arrow-right-circle-fill" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/></svg>
+                    <span class="desc">${lang.quickJoin}</span>
+                </a>
+                <a class="btn" onclick="ompsEventRouter('hide');return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black" class="bi bi-x" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                    <span class="desc">${lang.quit}</span>
+                </a>
+            `;
+            }
+        },
+        userJump:(name,title,url) =>{
+            if(title.length>80){
+                title = title.substr(0,80)+"...";
+            }
+            var urlDat = "";
+            try { urlDat = window.btoa(url) }catch(e){}
+            var urlBtn = `<div style="text-align:right;"><a class="btn" data-url='${urlDat}' onclick="
+            if(confirm('${lang.jumpConfirm[0]}'+window.atob(event.currentTarget.getAttribute('data-url'))+'\\n${lang.jumpConfirm[1]}')){
+                try{window.top.location=window.atob(event.currentTarget.getAttribute('data-url'));}
+                catch(e)
+                {console.log(e);window.location=window.atob(event.currentTarget.getAttribute('data-url'));}
+            }
+            omps_noPop(event);
+            ">
+                <span>${lang.jumpTip[3]}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black"
+                    class="bi bi-arrow-right-circle-fill" viewBox="0 0 16 16">
+                    <path
+                        d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z" />
+                </svg>
+            </a></div>`;
+            if(!urlDat)urlBtn="【发生错误，无法跳转】";
+            return `
+            <span class="name">${getTextSafe(name)}</span>
+            &nbsp;:&nbsp;
+            <span>
+            ${lang.jumpTip[0]}${getTextSafe(name)}${lang.jumpTip[1]}${getTextSafe(title)}${lang.jumpTip[2]}${urlBtn}
+            </span>
+            `
         }
     }
 
@@ -229,7 +360,7 @@
     function detecVideoCode() {
         if (!initFinish) return;
         if (getVideoCode() != videoCode) {
-            showToast(lang.videoChange,1,1);
+            showToast(lang.videoChange, 1, 1);
             videoCode = getVideoCode();
             initFinish = false;
             showTip();
@@ -239,6 +370,12 @@
     function getVideoCode() {
         var orgCode = "";
         try { orgCode = GM_window.top.document.title; } catch (e) { };
+        try {
+            videoTitle = GM_window.document.title;
+            videoUrl = GM_window.location.href;
+            videoTitle = GM_window.top.document.title; 
+            videoUrl = GM_window.top.location.href;
+        } catch (e) { };
         if (!orgCode) {
             try { orgCode = GM_window.location.host + GM_window.location.pathname; } catch (e) { };
         }
@@ -251,7 +388,6 @@
         videoCode = getVideoCode();
         callBack();
     }
-    //=============视频识别代码计算==============
 
 
     //==========TOAST提示条====================
@@ -265,6 +401,7 @@
         if (!toastElement) {
             toastElement = document.createElement("div");
             toastElement.className = "omps-tip"
+            toastElement.onclick = noPop;
             video.parentNode.appendChild(toastElement);
         }
 
@@ -283,12 +420,12 @@
             if (toastElement) toastElement.classList.remove("open");
         }
     }
-    //==========TOAST提示条====================
 
 
     //==========加入流程===========
     function showTip() {
         //STYLE_A 加入目标window，使得视频播放器中样式可用
+        console.log("[OMPS]:已找到视频")
         var el = document.createElement("style");
         el.innerHTML = css;
         el.className = "OMPS_CSS";
@@ -309,6 +446,7 @@
     function testVideo() {
         globalCount--;
         try {
+            document.body.setAttribute("data-omps-injected", "true");
             video = null
             var videos = document.getElementsByTagName("video");
             for (let i = 0; i < videos.length; i++) {
@@ -346,6 +484,10 @@
     }
     //连接网络
     function initNetwork() {
+        if (trustKey == "none") {
+            trustKey = HASH.md5(Date.now() + "--" + parseInt(Math.random() * 1000000));
+            GM_set("trust", trustKey);
+        }
         if (ws) {
             try { ws.onclose = ws.onerror = () => { }; } catch (e) { }
             try { ws.close(); } catch (e) { }
@@ -356,7 +498,10 @@
             sendDat({
                 type: "reg",
                 user: setting.userId,
-                group: videoCode + "-" + setting.group
+                group: videoCode + "-" + setting.group,
+                trust: trustKey,
+                title: videoTitle,
+                url: videoUrl
             });
         }, 1000);
         ws.onclose = ws.onerror = () => {
@@ -394,27 +539,127 @@
                 initNetwork();
                 closeSettingPanel();
             }
-
+        } else if (name == "sendMsg") {
+            sendMsg();
         }
+    }
+    var noPop = GM_window.omps_noPop = function (event) {
+        event.stopPropagation();
     }
     //=========前端暴露函数=============
 
+
+    //=========好友列表================
+    var friends = {}, friendCountTick = 0, friCtr;
+    function addFriendItem(name) {
+        var el = document.createElement("div");
+        friCtr.appendChild(el);
+        friends[name] = {
+            tick: friendCountTick,
+            element: el,
+            time: 0
+        }
+    }
+    function removeFriendItem(name) {
+        friCtr.removeChild(friends[name].element);
+        delete friends[name];
+    }
+    function updateFriendList(list) {
+        if (!friCtr) {
+            friCtr = document.createElement("div");
+            friCtr.className = "omps-friend"
+            video.parentNode.appendChild(friCtr);
+        }
+        friendCountTick++;
+        for (let i = 0; i < list.length; i++) {
+            if (!friends[list[i].name]) addFriendItem(list[i].name);
+            if (list[i].name == setting.userId)
+                friends[list[i].name].element.innerText = list[i].name + "(你) ";
+            else {
+                var strSig = "";
+                if (list[i].time > lastTime) {
+                    strSig = "+";
+                }
+                friends[list[i].name].element.innerText = list[i].name + "(" + strSig + ((list[i].time - lastTime) / 1000).toFixed(1) + "s) ";
+            }
+            friends[list[i].name].tick = friendCountTick;
+        }
+        for (const friid in friends) {
+            if (Object.hasOwnProperty.call(friends, friid)) {
+                if (friends[friid].tick != friendCountTick) {
+                    friends[friid].element.className = "item offline";
+                    if (friendCountTick - friends[friid].tick > 2) {
+                        removeFriendItem(friid);
+                    }
+                } else {
+                    friends[friid].element.className = "item";
+                }
+            }
+        }
+    }
+
+    //========消息====================
+    var msgCtr, msgInput;
+    function addMsgInput() {
+        var msgInputE = document.createElement("div");
+        msgInputE.className = "omps-chat-input tipPos";
+        msgInputE.innerHTML = msgMaker.chat_input();
+        msgInputE.onclick = noPop;
+        video.parentNode.appendChild(msgInputE);
+        msgInput = msgInputE.getElementsByTagName("input")[0];
+        setTimeout(() => msgInputE.classList.remove("tipPos"), 3000);
+    }
+    function createMsg(from, msg, time) {
+        if (from == setting.userId) time = "你";
+        else if (time > 0) time = "+" + time + "s";
+        else time += "s";
+        createMsgRaw( msgMaker.chat_block(from, msg, time))
+    }
+    function createMsgRaw(msg,delTime){
+        if (!msgCtr) {
+            msgCtr = document.createElement("div");
+            msgCtr.className = "omps-chat";
+            video.parentNode.appendChild(msgCtr);
+        }
+        var el = document.createElement("div")
+        el.className = "item";
+        el.innerHTML = msg
+        msgCtr.appendChild(el);
+        var hideTime = Math.max(Math.min(8000, msg.length * 400), 3000);
+        if(delTime)hideTime = delTime;
+        setTimeout(() => el.className = "item open", 200);
+        setTimeout(() => el.className = "item", hideTime + 200);
+        setTimeout(() => msgCtr.removeChild(el), hideTime + 600);
+    }
+    function sendMsg() {
+        var text = msgInput.value;
+        msgInput.value = "";
+        if (!text) return;
+        sendDat({
+            type: "msg",
+            time: parseInt(video.currentTime * 1000),
+            msg: text
+        })
+    }
     //200ms时钟，用于触发等待点和上报时间
     setInterval(() => {
+        if (toastCnt > 0) {
+            if (--toastCnt == 0) {
+                hideToast();
+                setTimeout(() => {
+                    if (toastCnt == 0) hideToast(1);
+                }, 1000);
+            }
+        }
         if (initFinish) {
             globalCount++;
             globalCount %= 40;
+            if (setting.friend && globalCount % 20 == 0) {
+                sendDat({ type: "list" });
+            }
             if (globalCount == 0) {
                 tmpLocalDelay = Date.now();
                 sendDat({ type: "delay" });
-            }
-            if (toastCnt > 0) {
-                if (--toastCnt == 0) {
-                    hideToast();
-                    setTimeout(() => {
-                        if (toastCnt == 0) hideToast(1);
-                    }, 1000);
-                }
             }
 
             var currentTime = parseInt(video.currentTime * 1000);
@@ -468,7 +713,14 @@
                     showToast(msgMaker.delayTip(localDelay), 2);
                 }
                 if (!initFinish) {
-                    setTimeout(() => { initFinish = true; detecVideoCode(); showToast(msgMaker.success(videoCode, localDelay), 5, 1); }, 1000);
+                    setTimeout(() => {
+                        initFinish = true;
+                        detecVideoCode();
+                        showToast(msgMaker.success(videoCode, localDelay), 5, 1);
+                    }, 1000);
+                    if (setting.showMsgIpt) {
+                        addMsgInput();
+                    }
                 }
                 break;
             case "pause":
@@ -511,6 +763,27 @@
                 }
                 pauseAt = -1;
                 showToast(msgMaker.syncSuccess(), 1);
+                break;
+            case "error":
+                ws.onerror = ws.onclose = () => { };
+                ws.close();
+                showToast(msgMaker.error(data.msg), 6, 10);
+                break;
+            case "list":
+                if (setting.friend) {
+                    updateFriendList(data.list);
+                }
+                break;
+            case "msg":
+                if (!setting.hideMsg) {
+                    createMsg(data.name, data.msg, parseFloat(realTime - video.currentTime).toFixed(1));
+                }
+                break;
+            case "userJmp":
+                if (data.title && !setting.hideMsg) {
+                    createMsgRaw(msgMaker.userJump(data.name,data.title,data.url),10000);
+                }
+                break;
             default:
                 break;
 
@@ -518,5 +791,10 @@
     }
     //MD5 JS
     !function (n) { "use strict"; function d(n, t) { var r = (65535 & n) + (65535 & t); return (n >> 16) + (t >> 16) + (r >> 16) << 16 | 65535 & r } function f(n, t, r, e, o, u) { return d((u = d(d(t, n), d(e, u))) << o | u >>> 32 - o, r) } function l(n, t, r, e, o, u, c) { return f(t & r | ~t & e, n, t, o, u, c) } function g(n, t, r, e, o, u, c) { return f(t & e | r & ~e, n, t, o, u, c) } function v(n, t, r, e, o, u, c) { return f(t ^ r ^ e, n, t, o, u, c) } function m(n, t, r, e, o, u, c) { return f(r ^ (t | ~e), n, t, o, u, c) } function c(n, t) { var r, e, o, u; n[t >> 5] |= 128 << t % 32, n[14 + (t + 64 >>> 9 << 4)] = t; for (var c = 1732584193, f = -271733879, i = -1732584194, a = 271733878, h = 0; h < n.length; h += 16)c = l(r = c, e = f, o = i, u = a, n[h], 7, -680876936), a = l(a, c, f, i, n[h + 1], 12, -389564586), i = l(i, a, c, f, n[h + 2], 17, 606105819), f = l(f, i, a, c, n[h + 3], 22, -1044525330), c = l(c, f, i, a, n[h + 4], 7, -176418897), a = l(a, c, f, i, n[h + 5], 12, 1200080426), i = l(i, a, c, f, n[h + 6], 17, -1473231341), f = l(f, i, a, c, n[h + 7], 22, -45705983), c = l(c, f, i, a, n[h + 8], 7, 1770035416), a = l(a, c, f, i, n[h + 9], 12, -1958414417), i = l(i, a, c, f, n[h + 10], 17, -42063), f = l(f, i, a, c, n[h + 11], 22, -1990404162), c = l(c, f, i, a, n[h + 12], 7, 1804603682), a = l(a, c, f, i, n[h + 13], 12, -40341101), i = l(i, a, c, f, n[h + 14], 17, -1502002290), c = g(c, f = l(f, i, a, c, n[h + 15], 22, 1236535329), i, a, n[h + 1], 5, -165796510), a = g(a, c, f, i, n[h + 6], 9, -1069501632), i = g(i, a, c, f, n[h + 11], 14, 643717713), f = g(f, i, a, c, n[h], 20, -373897302), c = g(c, f, i, a, n[h + 5], 5, -701558691), a = g(a, c, f, i, n[h + 10], 9, 38016083), i = g(i, a, c, f, n[h + 15], 14, -660478335), f = g(f, i, a, c, n[h + 4], 20, -405537848), c = g(c, f, i, a, n[h + 9], 5, 568446438), a = g(a, c, f, i, n[h + 14], 9, -1019803690), i = g(i, a, c, f, n[h + 3], 14, -187363961), f = g(f, i, a, c, n[h + 8], 20, 1163531501), c = g(c, f, i, a, n[h + 13], 5, -1444681467), a = g(a, c, f, i, n[h + 2], 9, -51403784), i = g(i, a, c, f, n[h + 7], 14, 1735328473), c = v(c, f = g(f, i, a, c, n[h + 12], 20, -1926607734), i, a, n[h + 5], 4, -378558), a = v(a, c, f, i, n[h + 8], 11, -2022574463), i = v(i, a, c, f, n[h + 11], 16, 1839030562), f = v(f, i, a, c, n[h + 14], 23, -35309556), c = v(c, f, i, a, n[h + 1], 4, -1530992060), a = v(a, c, f, i, n[h + 4], 11, 1272893353), i = v(i, a, c, f, n[h + 7], 16, -155497632), f = v(f, i, a, c, n[h + 10], 23, -1094730640), c = v(c, f, i, a, n[h + 13], 4, 681279174), a = v(a, c, f, i, n[h], 11, -358537222), i = v(i, a, c, f, n[h + 3], 16, -722521979), f = v(f, i, a, c, n[h + 6], 23, 76029189), c = v(c, f, i, a, n[h + 9], 4, -640364487), a = v(a, c, f, i, n[h + 12], 11, -421815835), i = v(i, a, c, f, n[h + 15], 16, 530742520), c = m(c, f = v(f, i, a, c, n[h + 2], 23, -995338651), i, a, n[h], 6, -198630844), a = m(a, c, f, i, n[h + 7], 10, 1126891415), i = m(i, a, c, f, n[h + 14], 15, -1416354905), f = m(f, i, a, c, n[h + 5], 21, -57434055), c = m(c, f, i, a, n[h + 12], 6, 1700485571), a = m(a, c, f, i, n[h + 3], 10, -1894986606), i = m(i, a, c, f, n[h + 10], 15, -1051523), f = m(f, i, a, c, n[h + 1], 21, -2054922799), c = m(c, f, i, a, n[h + 8], 6, 1873313359), a = m(a, c, f, i, n[h + 15], 10, -30611744), i = m(i, a, c, f, n[h + 6], 15, -1560198380), f = m(f, i, a, c, n[h + 13], 21, 1309151649), c = m(c, f, i, a, n[h + 4], 6, -145523070), a = m(a, c, f, i, n[h + 11], 10, -1120210379), i = m(i, a, c, f, n[h + 2], 15, 718787259), f = m(f, i, a, c, n[h + 9], 21, -343485551), c = d(c, r), f = d(f, e), i = d(i, o), a = d(a, u); return [c, f, i, a] } function i(n) { for (var t = "", r = 32 * n.length, e = 0; e < r; e += 8)t += String.fromCharCode(n[e >> 5] >>> e % 32 & 255); return t } function a(n) { var t = []; for (t[(n.length >> 2) - 1] = void 0, e = 0; e < t.length; e += 1)t[e] = 0; for (var r = 8 * n.length, e = 0; e < r; e += 8)t[e >> 5] |= (255 & n.charCodeAt(e / 8)) << e % 32; return t } function e(n) { for (var t, r = "0123456789abcdef", e = "", o = 0; o < n.length; o += 1)t = n.charCodeAt(o), e += r.charAt(t >>> 4 & 15) + r.charAt(15 & t); return e } function r(n) { return unescape(encodeURIComponent(n)) } function o(n) { return i(c(a(n = r(n)), 8 * n.length)) } function u(n, t) { return function (n, t) { var r, e = a(n), o = [], u = []; for (o[15] = u[15] = void 0, 16 < e.length && (e = c(e, 8 * n.length)), r = 0; r < 16; r += 1)o[r] = 909522486 ^ e[r], u[r] = 1549556828 ^ e[r]; return t = c(o.concat(a(t)), 512 + 8 * t.length), i(c(u.concat(t), 640)) }(r(n), r(t)) } function t(n, t, r) { return t ? r ? u(t, n) : e(u(t, n)) : r ? o(n) : e(o(n)) } "function" == typeof define && define.amd ? define(function () { return t }) : "object" == typeof module && module.exports ? module.exports = t : n.md5 = t }(HASH);
+    window.onload = () => {
+        try {
+            document.body.setAttribute("data-omps-injected", "true");
+        } catch (e) { }
+    }
     testVideo();
 })();

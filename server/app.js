@@ -10,25 +10,37 @@ const server = createServer({
     key: readFileSync(__dirname + '/privkey.pem')
 }).listen(port);
 wss = new WebSocketServer({ server });
-var connectIds = {}, connectUser = {}, userConnect = {}, connectCount = 0;
+var connectIds = {}, connectUser = {}, userConnect = {}, connectCount = 1, userLastGrpId = {};
 wss.on('connection', function connection(ws) {
     let conId = connectCount++;
+    if (connectCount > 100000000) connectCount = 1;
+
     connectIds[conId] = ws;
     console.log(`[CONNECT]用户已连接，分配ID#${conId}`);
     ws.on('message', (data) => { wsMsg(data, conId); });
-    ws.on('close', () => {
-        if (connectUser[conId]) {
-            if (userConnect[connectUser[conId]]) {
-                delete userConnect[connectUser[conId]];
-            }
-            if (userGrp[connectUser[conId]]) {
-                decMenberGrp(userGrp[connectUser[conId]], connectUser[conId]);
-            }
-            delete connectUser[conId];
-        }
-        delete connectIds[conId];
-    });
+    ws.on('close', () => connectClosed(conId));
 });
+function closeConnect(conId) {
+    if (!connectIds[conId]) return;
+    var ws = connectIds[conId];
+    connectClosed(conId);
+    ws.close();
+}
+function connectClosed(conId) {
+    if (!connectIds[conId]) return;
+    if (connectUser[conId]) {
+        if (userTrusted[connectUser[conId]]) delete userTrusted[connectUser[conId]];
+        if (userConnect[connectUser[conId]]) {
+            delete userConnect[connectUser[conId]];
+        }
+        if (userGrp[connectUser[conId]]) {
+            decMenberGrp(userGrp[connectUser[conId]], connectUser[conId]);
+        }
+        delete connectUser[conId];
+    }
+    delete connectIds[conId];
+
+}
 function commandUser(userId, data) {
     let conId = userConnect[userId];
     let ws = connectIds[conId];
@@ -40,9 +52,10 @@ function commandUser(userId, data) {
 }
 //组管理部分
 //本部分代码用于管理连接的用户分组，并将不同群组的进度信息进行处理并发送指令用于同步
-var grpTable = {}, userGrp = {}, grpData = {};
+var grpTable = {}, userGrp = {}, grpData = {}, userTrusted = {};
 function commandGrp(grpId, data) {
     console.log("[GRP_CMD]" + data.type, data);
+    if (!grpTable[grpId]) return;
     grpTable[grpId].forEach(user => {
         commandUser(user, data);
     });
@@ -85,7 +98,6 @@ function dealInfoGrp(grpId) {
             grpData[grpId].status = "normal";
         }
     }
-
 }
 function updateGrp(grpId, userId, timeStamp) {
     if (!grpData[grpId]) return;
@@ -118,6 +130,7 @@ function addMenberGrp(grpId, userId) {
     //新加入用户同步进度
     let grpTime = grpData[grpId].maxTime;
     if (!grpTime) grpTime = 0;
+
     commandUser(userId, { type: "init", time: grpTime });
     //广播加入通知
     commandGrp(grpId, { type: "join", user: userId });
@@ -172,14 +185,29 @@ function wsMsg(data, conId) {
     switch (dat.type) {
         case "reg":
             if (userConnect[user]) {
-                if (connectIds[conId]) {
-                    connectIds[conId].send(JSON.stringify({ type: "error", msg: "E_USERNAME_DUMPL" }));
-                    connectIds[conId].close();
+                if (userTrusted[user] && userTrusted[user] == dat.trust) {
+                    commandUser(user, { type: "error", msg: "E_SECOND_CONN" });
+                    closeConnect(userConnect[user]);
+                    console.log(`[REGIEST]用户“${user}”已移除(重名再次连接)`);
+                } else {
+                    if (connectIds[conId]) {
+                        connectIds[conId].send(JSON.stringify({ type: "error", msg: "E_USERNAME_DUMPL" }));
+                        connectIds[conId].close();
+                    }
+                    break;
                 }
-                break;
             }
             connectUser[conId] = user;
             userConnect[user] = conId;
+            userTrusted[user] = dat.trust;
+
+            if (userLastGrpId[user] && dat.title) {
+                if (grpTable[userLastGrpId[user]]) {
+                    commandGrp(userLastGrpId[user], { type: "userJmp", name: user, title: dat.title,url:dat.url});
+                }
+            }
+            userLastGrpId[user] = dat.group;
+
             addMenberGrp(dat.group, user);
             console.log(`[REGIEST]用户#${conId}已注册,群组#${dat.group},名字：“${user}”`);
             break;
@@ -201,7 +229,31 @@ function wsMsg(data, conId) {
         case "ping":
             updateGrp(userGetGrp(user), user, dat.time);
             break;
+        case "list":
+            var grpId = userGetGrp(user), ret = [];
+            if (grpTable[grpId] && grpData[grpId] && grpData[grpId].time) {
+                grpTable[grpId].forEach(usr => {
+                    ret.push({
+                        name: usr,
+                        time: grpData[grpId].time[usr]
+                    })
+                });
+            }
+            commandUser(user, {
+                type: "list",
+                list: ret
+            });
+            break;
+        case "msg":
+            commandGrp(userGetGrp(user), {
+                type: "msg",
+                time: dat.time,
+                msg: dat.msg,
+                name: user
+            });
+            break;
         case "delay":
             commandUser(user, { type: "delay" });
+            break;
     }
 }
