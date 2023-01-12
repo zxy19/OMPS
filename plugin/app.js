@@ -3,7 +3,7 @@
 // @namespace    https://xypp.cc/omps/
 // @updateURL    https://xypp.cc/omps/app.js
 // @downloadURL  https://xypp.cc/omps/app.js
-// @version      6.0
+// @version      7.0
 // @description  OMPS多人在线同播。脚本默认对所有站点均生效。您可以在TamperMonkey=>管理面板=>OMPS多人在线同播=>设置=>用户排除中修改不想要生效的网站或直接修改源代码
 // @author       小鱼飘飘
 // @match        *://*/*
@@ -45,9 +45,14 @@
     }
     var ws;
     var video;
+    var currentDomain = GM_window.location.host;
+    var isTopWindow = false;
+    var topCode = "", topUrl = "", topTitle = "";
+    var frameWindowObjs = [];
+    var oneKeySetting = {}
     var trustKey = GM_get("trust", "none");
     var initFinish = false, lastTime = -1, pauseAt, globalCount = 24, toastCnt = 0, tmpLocalDelay, localDelay, initTime, videoCode = "", HASH = {}, videoTitle = "", videoUrl = "";
-    const css = `.omps-friend{position:absolute;top:140px;left:0}.omps-friend .item{height:30px;border-radius:0 40px 40px 0;background-color:rgba(0,0,0,0.772);padding-left:10px;padding-right:5px;line-height:25px;font-size:15px;color:white;max-width:300px;margin-top:3px}.omps-friend .item.offline{opacity:.5;text-decoration:line-through}.omps-tip{position:absolute;top:100px;height:40px;border-radius:0 40px 40px 0;left:-300px;background-color:rgba(0,0,0,0.772);padding-left:10px;line-height:35px;color:white;max-width:100%;z-index:10000000;transition:all 1s;opacity:0}.omps-tip.open{left:0;opacity:1}.omps-tip div{display:inline;font-size:20px}.omps-tip .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 7px;margin-right:6px;line-height:13px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-tip .btn svg,.omps-chat-input svg,.omps-chat svg,.omps-friend svg{height:20px;width:20px}.omps-tip .btn svg path{fill:black}.omps-tip .btn:hover{background-color:#dcdcdc}.omps-tip .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-tip .btn span{display:none}.omps-tip .btn:hover span{animation:showLabelAnim 1s linear 1s 1;animation-fill-mode:forwards;max-width:0;overflow-x:hidden;word-break:keep-all;margin:0;display:unset;padding:0;line-height:20px;overflow-y:clip;float:right}@keyframes showLabelAnim{0%{max-width:0}100%{max-width:200px}}.omps-config{font-size:18px;z-index:10000003;max-width:calc(100% - 100px);position:absolute;top:50px;width:600px;left:50px;background-color:rgba(0,0,0,0.772);border-radius:10px;color:white;padding:20px;max-height:calc(100% - 100px);overflow:auto}.omps-config input{display:block;outline:0;border:0;border-radius:5px;color:black;background-color:rgba(255,255,255,0.772)}.omps-config input:active{box-shadow:skyblue 0 0 5px 3px}.omps-config input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-config input.i{height:30px;width:300px;max-width:100%}.omps-config input.c{height:20px;width:20px;-webkit-appearance:checkbox!important;appearance:checkbox!important}.omps-config label{display:block;text-decoration:underline}.omps-config small{display:block;color:lightgray}.omps-config .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-config .btn:hover{background-color:#dcdcdc}.omps-config .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-chat{font-size:18px;position:absolute;top:5px;right:0;overflow-x:hidden;max-width:100%;width:400px}.omps-chat .item{border-radius:40px 0 0 40px;background-color:rgba(0,0,0,0.772);color:white;max-width:calc(100% - 30px);z-index:10000000;transition:all 1s;opacity:0;transform:translateX(100%);position:relative;margin-top:2px;max-height:0;line-break:loose;word-break:break-all;white-space:normal;overflow:hidden}.omps-chat .item.open{transform:translateX(0%);opacity:1;max-height:400px;padding:10px}.omps-chat .item .name{text-decoration:underline;font-weight:bold}.omps-chat .item .delay{font-size:x-small;font-style:italic;position:absolute;top:1px;right:1px}.omps-chat-input{position:absolute;bottom:50px;right:100px;width:calc(100% - 200px);background-color:rgba(0,0,0,0.772);height:40px}.omps-chat-input{font-size:18px;position:absolute;bottom:150px;right:100px;width:calc(100% - 200px);background-color:rgba(0,0,0,0.772);border-radius:50px;padding:10px 30px;opacity:0;transition:all .5s}.omps-chat-input.tipPos{animation:omps-tipPos 1s ease-in-out 0s infinite}.omps-chat-input:hover,.omps-chat-input.inputActive{opacity:1}@keyframes omps-tipPos{0%{opacity:0}50%{opacity:.5}100%{opacity:0}}.omps-chat-input input{background-color:rgba(0,0,0,0);display:inline-block;outline:0;border:rgba(255,255,255,0.497) 1px solid;border-radius:5px;width:calc(100% - 100px);height:100%;color:white}.omps-chat-input input:active{box-shadow:skyblue 0 0 5px 3px}.omps-chat-input input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-chat-input .btn,.omps-chat .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-chat-input .btn svg path,.omps-chat .btn svg path{fill:black}.omps-chat-input .btn:hover,.omps-chat .btn:hover{background-color:#dcdcdc}.omps-chat-input .btn:active,.omps-chat .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-chat .btn{padding: 2px 5px;font-size: 16px;}`;
+    const css = `.omps-friend .item:hover{text-decoration: underline;cursor: pointer;}.omps-friend .item:hover::after{content: "→";}.omps-friend{position:absolute;top:140px;left:0}.omps-friend .item{height:30px;border-radius:0 40px 40px 0;background-color:rgba(0,0,0,0.772);padding-left:10px;padding-right:5px;line-height:25px;font-size:15px;color:white;max-width:300px;margin-top:3px}.omps-friend .item.offline{opacity:.5;text-decoration:line-through}.omps-tip{position:absolute;top:100px;height:40px;border-radius:0 40px 40px 0;left:-300px;background-color:rgba(0,0,0,0.772);padding-left:10px;line-height:35px;color:white;max-width:100%;z-index:10000000;transition:all 1s;opacity:0}.omps-tip.open{left:0;opacity:1}.omps-tip div{display:inline;font-size:20px}.omps-tip .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 7px;margin-right:6px;line-height:13px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-tip .btn svg,.omps-chat-input svg,.omps-chat svg,.omps-friend svg{height:20px;width:20px}.omps-tip .btn svg path{fill:black}.omps-tip .btn:hover{background-color:#dcdcdc}.omps-tip .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-tip .btn span{display:none}.omps-tip .btn:hover span{animation:showLabelAnim 1s linear 1s 1;animation-fill-mode:forwards;max-width:0;overflow-x:hidden;word-break:keep-all;margin:0;display:unset;padding:0;line-height:20px;overflow-y:clip;float:right}@keyframes showLabelAnim{0%{max-width:0}100%{max-width:200px}}.omps-config{font-size:18px;z-index:10000003;max-width:calc(100% - 100px);position:absolute;top:50px;width:600px;left:50px;background-color:rgba(0,0,0,0.772);border-radius:10px;color:white;padding:20px;max-height:calc(100% - 100px);overflow:auto}.omps-config input{display:block;outline:0;border:0;border-radius:5px;color:black;background-color:rgba(255,255,255,0.772)}.omps-config input:active{box-shadow:skyblue 0 0 5px 3px}.omps-config input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-config input.i{height:30px;width:300px;max-width:100%}.omps-config input.c{height:20px;width:20px;-webkit-appearance:checkbox!important;appearance:checkbox!important}.omps-config label{display:block;text-decoration:underline}.omps-config small{display:block;color:lightgray}.omps-config .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-config .btn:hover{background-color:#dcdcdc}.omps-config .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-chat{font-size:18px;position:absolute;top:5px;right:0;overflow-x:hidden;max-width:100%;width:400px}.omps-chat .item{border-radius:40px 0 0 40px;background-color:rgba(0,0,0,0.772);color:white;max-width:calc(100% - 30px);z-index:10000000;transition:all 1s;opacity:0;transform:translateX(100%);position:relative;margin-top:2px;max-height:0;line-break:loose;word-break:break-all;white-space:normal;overflow:hidden}.omps-chat .item.open{transform:translateX(0%);opacity:1;max-height:400px;padding:10px}.omps-chat .item .name{text-decoration:underline;font-weight:bold}.omps-chat .item .delay{font-size:x-small;font-style:italic;position:absolute;top:1px;right:1px}.omps-chat-input{position:absolute;bottom:50px;right:100px;width:calc(100% - 200px);background-color:rgba(0,0,0,0.772);height:40px}.omps-chat-input{font-size:18px;position:absolute;bottom:150px;right:100px;width:calc(100% - 200px);background-color:rgba(0,0,0,0.772);border-radius:50px;padding:10px 30px;opacity:0;transition:all .5s}.omps-chat-input.tipPos{animation:omps-tipPos 1s ease-in-out 0s infinite}.omps-chat-input:hover,.omps-chat-input.inputActive{opacity:1}@keyframes omps-tipPos{0%{opacity:0}50%{opacity:.5}100%{opacity:0}}.omps-chat-input input{background-color:rgba(0,0,0,0);display:inline-block;outline:0;border:rgba(255,255,255,0.497) 1px solid;border-radius:5px;width:calc(100% - 100px);height:100%;color:white}.omps-chat-input input:active{box-shadow:skyblue 0 0 5px 3px}.omps-chat-input input:focus{box-shadow:skyblue 0 0 3px 1px}.omps-chat-input .btn,.omps-chat .btn{color:black;background-color:#fff;border-radius:30px;padding:5px 10px;margin-right:10px;box-shadow:grey 1px 1px 1px;text-align:center;display:inline-block;vertical-align:middle}.omps-chat-input .btn svg path,.omps-chat .btn svg path{fill:black}.omps-chat-input .btn:hover,.omps-chat .btn:hover{background-color:#dcdcdc}.omps-chat-input .btn:active,.omps-chat .btn:active{box-shadow:inset gray 1px 1px 1px}.omps-chat .btn{padding: 2px 5px;font-size: 16px;}`;
     const lang = {
         join: "检测到视频，点击进入联机放映",
         reconfigure: "重新填写配置",
@@ -88,6 +93,7 @@
         },
         conErr: "无法连接到服务器，请刷新页面重试",
         pauseMsg: "有一位朋友的视频太慢了，等他一下...",
+        pauseHandMsg: "您似乎手动暂停了视频，如果继续观看请开始播放",
         playFail: "未能正确的开始播放视频！您需要手动点击播放按钮，否则您的好友可能需要等待您",
         delay: ["延迟达到了", "ms，可能会影响您或其他人的观影体验"],
         success: "连接成功，延迟",
@@ -101,16 +107,20 @@
         videoChange: "视频变更，准备重连",
         dumplName: "注册失败，与服务器中已连接的用户重名",
         secondConnect: "因为您的另一个客户端的连接，本页面已与服务器断开连接",
-        tiper:"提示",
-        jumpTip:["用户[","]从此视频转向观看‘","’","点击前往"],
-        jumpConfirm:["您即将前往","跳转到目标网站可能会带来不明的风险，您确定要跳转吗？"]
+        tiper: "提示",
+        jumpTip: ["用户[", "]从此视频转向观看‘", "’", "点击前往"],
+        jumpConfirm: ["您即将前往", "跳转到目标网站可能会带来不明的风险，您确定要跳转吗？"],
+        shareUrl: "成功创建了分享链接",
+        share: "分享",
+        waitTop: ["分享失败", "等待顶层页面响应，请稍后"],
+
     }
 
 
     //===========设置相关============
     var setting = {
         autoJoin: "",
-        userId: parseInt(Math.random() * 10000),
+        userId: "",
         group: "",
         silent: "",
         friend: "",
@@ -133,7 +143,7 @@
         var el = document.createElement("div");
         el.className = "omps-config";
         el.id = "omps-config";
-        el.onclick = noPop
+        el.onclick = noPop;
         el.innerHTML = msgMaker.settingPanel();
         document.body.appendChild(el);
         openedSettingPanel = el;
@@ -186,7 +196,7 @@
             <br>
             <label>${lang.setting.friend.label}</label>
             <small>${lang.setting.friend.tip}</small>
-            <input class="omps-input c" type="checkbox" id="omps-input-friend" ${setting.silent ? "checked" : ""}>
+            <input class="omps-input c" type="checkbox" id="omps-input-friend" ${setting.friend ? "checked" : ""}>
             <br>
             <label>${lang.setting.showMsgIpt.label}</label>
             <small>${lang.setting.showMsgIpt.tip}</small>
@@ -216,11 +226,15 @@
             </a>
             `;
         },
-        success: (code, delv) => {
-            return `${lang.success}${getTextSafe(delv)}
+        success: (code, delv, group) => {
+            return `${getTextSafe(group)} ${lang.success}${getTextSafe(delv)}
                 <a class="btn" onclick="ompsEventRouter('config');return false;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black"class="bi bi-gear-fill" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z" /></svg>
                 <span class="desc">${lang.reconfigure}</span>
+            </a>
+            <a class="btn" onclick="ompsEventRouter('share');return false;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black" class="bi bi-share-fill" viewBox="0 0 16 16"><path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/></svg>
+                <span class="desc">${lang.share}</span>
             </a>
             <a class="btn" onclick="ompsEventRouter('hide');return false;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="black" class="bi bi-x" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
@@ -316,12 +330,12 @@
             `;
             }
         },
-        userJump:(name,title,url) =>{
-            if(title.length>80){
-                title = title.substr(0,80)+"...";
+        userJump: (name, title, url) => {
+            if (title.length > 80) {
+                title = title.substr(0, 80) + "...";
             }
             var urlDat = "";
-            try { urlDat = window.btoa(url) }catch(e){}
+            try { urlDat = window.btoa(url) } catch (e) { }
             var urlBtn = `<div style="text-align:right;"><a class="btn" data-url='${urlDat}' onclick="
             if(confirm('${lang.jumpConfirm[0]}'+window.atob(event.currentTarget.getAttribute('data-url'))+'\\n${lang.jumpConfirm[1]}')){
                 try{window.top.location=window.atob(event.currentTarget.getAttribute('data-url'));}
@@ -337,7 +351,7 @@
                         d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z" />
                 </svg>
             </a></div>`;
-            if(!urlDat)urlBtn="【发生错误，无法跳转】";
+            if (!urlDat) urlBtn = "【发生错误，无法跳转】";
             return `
             <span class="name">${getTextSafe(name)}</span>
             &nbsp;:&nbsp;
@@ -345,9 +359,14 @@
             ${lang.jumpTip[0]}${getTextSafe(name)}${lang.jumpTip[1]}${getTextSafe(title)}${lang.jumpTip[2]}${urlBtn}
             </span>
             `
+        },
+        share_url: (url) => {
+            return `
+            <span class="name">${lang.shareUrl}</span><br>
+            <div><textarea style="background:rgba(0,0,0,0);color:white;width:90%;height:60px;">${url}</textarea></div>
+            `
         }
     }
-
 
 
     // 向服务器发送数据
@@ -355,37 +374,129 @@
         ws.send(JSON.stringify(data));
     }
 
+    //=============页内通讯=====================
+    function registeInPageMessage() {
+        GM_window.addEventListener("message", inPageOnMessage);
+        if (GM_window !== GM_window.top) {
+            isTopWindow = false;
+            GM_window.top.postMessage({
+                fromApp: "OMPS",
+                action: "reg"
+            }, "*");
+        } else {
+            isTopWindow = true;
+            topUrl = GM_window.location.href;
+            topTitle = GM_window.document.title;
+        }
+    }
+    function inPageOnMessage(event) {
+        var data = event.data;
+        if ((data.fromApp || "") != "OMPS") return;
+        if (data.action == "reg") {
+            event.source.postMessage({
+                fromApp: "OMPS",
+                action: "setCode",
+                url: topUrl,
+                title: topTitle,
+                code: getVideoCode(),
+            }, "*");
+            if (oneKeySetting.exist)
+                event.source.postMessage({
+                    fromApp: "OMPS",
+                    action: "onekey",
+                    data: oneKeySetting,
+                }, "*");
+            frameWindowObjs.push(event.source)
+        } else if (data.action == "setHash") {
+            GM_window.location.hash = event.data.val;
+        } else if (data.action == "setCode") {
+            topCode = data.code;
+            topUrl = data.url;
+            topTitle = data.title;
+            console.log("[OMPS]TOP_CODE Received:" + topCode);
+            detecVideoCode();
+        } else if (data.action == "onekey") {
+            oneKeySetting = data.data;
+            applyOneKeySetting();
+        }
+    }
+
     //=============视频识别代码计算==============
+
+    function videoCodeOutdateEventRegist_title() {
+        try {
+            var titleEl = document.getElementsByTagName("title")[0];
+            var MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+            var MutationObserverConfig = {
+                childList: true,
+                subtree: true,
+                characterData: true
+            };
+            var observer = new MutationObserver(function (mutations) {
+                console.log("[OMPS]:视频检测到标题变化");
+                topUrl = GM_window.location.href;
+                topTitle = GM_window.document.title;
+                for (let i = 0; i < frameWindowObjs.length; i++) {
+                    frameWindowObjs[i].postMessage({
+                        fromApp: "OMPS",
+                        action: "setCode",
+                        url: topUrl,
+                        title: topTitle,
+                        code: getVideoCode(),
+                    }, "*");
+                }
+                detecVideoCode();
+            });
+            observer.observe(titleEl, MutationObserverConfig);
+        } catch (ignore) { }
+    }
     //检测VideoCode是否过期
     function detecVideoCode() {
         if (!initFinish) return;
-        if (getVideoCode() != videoCode) {
-            showToast(lang.videoChange, 1, 1);
-            videoCode = getVideoCode();
-            initFinish = false;
-            showTip();
-        } else setTimeout(detecVideoCode, 5000);
+        let ovideoCode = videoCode;
+        calcVideoCode(video, function () {
+            if (videoCode != ovideoCode || topTitle != GM_window.document.title) {
+                showToast(lang.videoChange, 1, 1);
+                initFinish = false;
+                try { ws.onclose = ws.onerror = () => { }; } catch (e) { }
+                try { ws.close(); } catch (e) { }
+                showTip();
+            } else setTimeout(detecVideoCode, 5000);
+        });
     }
     //计算当前视频对应的VideoCode（方案1：取视频所在的顶层页面标题，方案2：取视频所在页面的除query以外的URL）
     function getVideoCode() {
         var orgCode = "";
-        try { orgCode = GM_window.top.document.title; } catch (e) { };
+        videoUrl = videoTitle = "";
         try {
-            videoTitle = GM_window.document.title;
-            videoUrl = GM_window.location.href;
-            videoTitle = GM_window.top.document.title; 
+            orgCode = GM_window.top.document.title;
+            videoTitle = GM_window.top.document.title;
             videoUrl = GM_window.top.location.href;
         } catch (e) { };
-        if (!orgCode) {
-            try { orgCode = GM_window.location.host + GM_window.location.pathname; } catch (e) { };
-        }
         var tmpVideoCode = HASH.md5(orgCode);
         tmpVideoCode = tmpVideoCode.toUpperCase();
         return tmpVideoCode;
     }
     //更新VideoCode
-    function calcVideoCode(video, callBack) {
-        videoCode = getVideoCode();
+    function calcVideoCode(_video, callBack, count = 0) {
+        globalCount = 0;
+        if (count > 10) {
+            console.log("[OMPS]TOP_CODE Recv. timeout");
+            video = null;
+            globalCount = 24;
+            videoCode = "";
+            testVideo();
+            return;
+        }
+        let t_videoCode = getVideoCode();
+        if (!isTopWindow) {
+            if (!topCode) {
+                console.log("[OMPS]STILL WAITING TOP");
+                return setTimeout(calcVideoCode, 1000, _video, callBack, (count || 0) + 1);
+            }
+        }
+        t_videoCode = HASH.md5(t_videoCode + topCode);
+        videoCode = t_videoCode.toUpperCase();
         callBack();
     }
 
@@ -423,6 +534,19 @@
 
 
     //==========加入流程===========
+    function ableToDirectJoin() {
+        var lastJoinTime = parseInt(GM_get("lastTime", 0));
+        var lastJoinDomain = GM_get("lastDomain", "");
+        if (Date.now() - lastJoinTime < 60 * 1000 && lastJoinDomain == currentDomain) {
+            console.log("[OMPS]:判断自动跳转视频，自动加入已生效");
+            return true;
+        }
+        return false;
+    }
+    function updateDirectJoin() {
+        GM_set("lastTime", Date.now());
+        GM_set("lastDomain", currentDomain);
+    }
     function showTip() {
         //STYLE_A 加入目标window，使得视频播放器中样式可用
         console.log("[OMPS]:已找到视频")
@@ -436,12 +560,16 @@
         el.className = "OMPS_CSS";
         document.body.appendChild(el);
 
-        if (setting.autoJoin && setting.userId && setting.group) {
+
+        if (ableToDirectJoin() || setting.oneKeyJoin) {
+            setting.oneKeyJoin = true;
+            ompsEventRouter("create");
+        } else if (setting.autoJoin && setting.userId && setting.group) {
             ompsEventRouter("create");
         } else
             showToast(msgMaker.joinAsk(), 20, 1);
     }
-    var getVideosNextIframeList
+    var getVideosNextIframeList;
     //获取视频
     function testVideo() {
         globalCount--;
@@ -461,6 +589,11 @@
                     try {
                         var frameBody = getVideosNextIframeList[i].contentDocument.body;
                         if (frameBody.getAttribute("data-omps-injected") == "true") continue;
+                        if (frameBody.getAttribute("data-omps-injected") != "waitParent") {
+                            frameBody.setAttribute("data-omps-injected", "waitParent");
+                            globalCount++;
+                            continue;
+                        }
                         getVideosNextIframeList[i].contentWindow.ompsEventRouter = ompsEventRouter;
                         var videos = getVideosNextIframeList[i].contentDocument.getElementsByTagName("video");
                         for (let i = 0; i < videos.length; i++) {
@@ -541,19 +674,27 @@
             }
         } else if (name == "sendMsg") {
             sendMsg();
+        } else if (name == "share") {
+            createShare();
         }
     }
     var noPop = GM_window.omps_noPop = function (event) {
         event.stopPropagation();
     }
-    //=========前端暴露函数=============
-
 
     //=========好友列表================
     var friends = {}, friendCountTick = 0, friCtr;
+    function jumpToFriend(event) {
+        noPop(event);
+        var friid = event.currentTarget.getAttribute("data-friend-name");
+        if (friends[friid].tick != friendCountTick) return;
+        video.currentTime = (friends[friid].time - friends[setting.userId].time + lastTime) / 1000;
+    }
     function addFriendItem(name) {
         var el = document.createElement("div");
         friCtr.appendChild(el);
+        el.setAttribute("data-friend-name", name);
+        el.onclick = jumpToFriend;
         friends[name] = {
             tick: friendCountTick,
             element: el,
@@ -573,6 +714,7 @@
         friendCountTick++;
         for (let i = 0; i < list.length; i++) {
             if (!friends[list[i].name]) addFriendItem(list[i].name);
+            friends[list[i].name].time = list[i].time;
             if (list[i].name == setting.userId)
                 friends[list[i].name].element.innerText = list[i].name + "(你) ";
             else {
@@ -613,9 +755,9 @@
         if (from == setting.userId) time = "你";
         else if (time > 0) time = "+" + time + "s";
         else time += "s";
-        createMsgRaw( msgMaker.chat_block(from, msg, time))
+        createMsgRaw(msgMaker.chat_block(from, msg, time))
     }
-    function createMsgRaw(msg,delTime){
+    function createMsgRaw(msg, delTime) {
         if (!msgCtr) {
             msgCtr = document.createElement("div");
             msgCtr.className = "omps-chat";
@@ -626,7 +768,7 @@
         el.innerHTML = msg
         msgCtr.appendChild(el);
         var hideTime = Math.max(Math.min(8000, msg.length * 400), 3000);
-        if(delTime)hideTime = delTime;
+        if (delTime) hideTime = delTime;
         setTimeout(() => el.className = "item open", 200);
         setTimeout(() => el.className = "item", hideTime + 200);
         setTimeout(() => msgCtr.removeChild(el), hideTime + 600);
@@ -641,8 +783,68 @@
             msg: text
         })
     }
+    //=======分享URL====================
+    function createShare() {
+        if (!topUrl && !isTopWindow) {
+            createMsg(lang.waitTop[0], lang.waitTop[1], 4000);
+            return;
+        }
+        var url = topUrl + "#&OMPS_room=" + setting.group + "&OMPS_join";
+        createMsgRaw(msgMaker.share_url(url), 10000);
+    }
+    function parseShareHash() {
+        try {
+            //一键加入放映厅等功能
+            var oneKeyCommand = GM_window.location.hash;
+            if (oneKeyCommand.charAt(0) == "#") oneKeyCommand = oneKeyCommand.slice(1);
+
+            if (oneKeyCommand) {
+                console.log("[OMPS]:正在处理一键链接参数");
+                oneKeySetting.exist = true;
+                var newHashLst = [];
+                var commandList = oneKeyCommand.split("&");
+                for (let i = 0; i < commandList.length; i++) {
+                    var cmd = commandList[i].split("=");
+                    if (cmd.length == 2 && cmd[0] == "OMPS_room") {
+                        oneKeySetting.group = cmd[1];
+                    } else if (cmd.length == 1 && cmd[0] == "OMPS_join") {
+                        oneKeySetting.oneKeyJoin = true;
+                    } else {
+                        newHashLst.push(cmd.join("="));
+                    }
+                }
+                GM_window.location.hash = newHashLst.join("&");
+            }
+        } catch (e) {
+            console.log(`[OMPS][ERROR]:${e}`);
+        }
+        applyOneKeySetting();
+        for (let i = 0; i < frameWindowObjs.length; i++) {
+            frameWindowObjs[i].postMessage({
+                fromApp: "OMPS",
+                action: "onekey",
+                data: oneKeySetting,
+            }, "*");
+        }
+    }
+    function applyOneKeySetting() {
+        if (oneKeySetting.exist) {
+            if (oneKeySetting.group) setting.group = oneKeySetting.group;
+            if (oneKeySetting.oneKeyJoin) setting.oneKeyJoin = true;
+            if (video) {
+                if (setting.group && setting.userId) { initNetwork(); }
+                else if (oneKeyJoin) {
+                    openSettingPanel();
+                }
+            }
+        }
+
+    }
     //200ms时钟，用于触发等待点和上报时间
+    var reportPtns = 0;
     setInterval(() => {
+        reportPtns++;
+        if (reportPtns == 100) reportPtns = 0;
         if (toastCnt > 0) {
             if (--toastCnt == 0) {
                 hideToast();
@@ -663,14 +865,16 @@
             }
 
             var currentTime = parseInt(video.currentTime * 1000);
-            if (globalCount % 2 == 0 && currentTime != lastTime) {
+            if (
+                (globalCount % 2 == 0 && currentTime != lastTime)
+            ) {
                 sendDat({
                     type: "ping",
                     time: currentTime + localDelay
-                })
+                });
                 lastTime = currentTime;
             }
-            if (pauseAt != -1 && video.currentTime > pauseAt) {
+            if (pauseAt != -1 && video.currentTime >= pauseAt) {
                 video.pause();
                 showToast(msgMaker.pauseMsg());
                 pauseAt = -1;
@@ -704,6 +908,7 @@
                 }
                 break;
             case "delay":
+                updateDirectJoin();
                 localDelay = parseInt((Date.now() - tmpLocalDelay) / 2);
                 if (initTime != 0) {
                     video.currentTime = (initTime + 3 * localDelay) / 1000;
@@ -716,7 +921,9 @@
                     setTimeout(() => {
                         initFinish = true;
                         detecVideoCode();
-                        showToast(msgMaker.success(videoCode, localDelay), 5, 1);
+                        var delayTime = 5;
+                        if (setting.autoJoin || setting.oneKeyJoin) delayTime = 12;
+                        showToast(msgMaker.success(videoCode, localDelay, setting.group), delayTime, 1);
                     }, 1000);
                     if (setting.showMsgIpt) {
                         addMsgInput();
@@ -735,6 +942,7 @@
                 break;
             case "play":
                 //服务器发送Play指令
+                pauseAt = -1;
                 if (video.currentTime > time) video.currentTime = time;
                 try {
                     video.play();
@@ -742,7 +950,6 @@
                 } catch (e) {
                     showToast(msgMaker.playFail());
                 }
-                pauseAt = -1;
                 break;
             case "join":
                 showToast(msgMaker.playerJoin(data.user), 1);
@@ -781,7 +988,7 @@
                 break;
             case "userJmp":
                 if (data.title && !setting.hideMsg) {
-                    createMsgRaw(msgMaker.userJump(data.name,data.title,data.url),10000);
+                    createMsgRaw(msgMaker.userJump(data.name, data.title, data.url), 10000);
                 }
                 break;
             default:
@@ -796,5 +1003,8 @@
             document.body.setAttribute("data-omps-injected", "true");
         } catch (e) { }
     }
+    registeInPageMessage();
+    parseShareHash();
+    videoCodeOutdateEventRegist_title();
     testVideo();
 })();
