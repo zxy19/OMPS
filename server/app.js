@@ -6,8 +6,8 @@ const port = 8093;
 //连接管理部分
 //该部分控制Websocket的连接和消息事件，以及在关闭连接时释放资源
 const server = createServer({
-    cert: readFileSync(__dirname + '/fullchain.pem'),
-    key: readFileSync(__dirname + '/privkey.pem')
+    cert: readFileSync(__dirname + '/ssl/fullchain.pem'),
+    key: readFileSync(__dirname + '/ssl/privkey.pem')
 }).listen(port);
 wss = new WebSocketServer({ server });
 var connectIds = {}, connectUser = {}, userConnect = {}, connectCount = 1, userLastGrpId = {};
