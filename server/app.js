@@ -2,6 +2,7 @@ const { WebSocketServer } = require('ws');
 const { createServer } = require('https');
 const { readFileSync } = require('fs');
 const port = 8093;
+const targetMinVer = "7.2.1";
 
 //连接管理部分
 //该部分控制Websocket的连接和消息事件，以及在关闭连接时释放资源
@@ -39,7 +40,6 @@ function connectClosed(conId) {
         delete connectUser[conId];
     }
     delete connectIds[conId];
-
 }
 function commandUser(userId, data) {
     let conId = userConnect[userId];
@@ -61,13 +61,22 @@ function commandGrp(grpId, data) {
     });
 }
 var lstSec = 0, currentSec;
+const TIME_REF_UNSYNC = 3000;
+const TIME_REF_WAIT = 1800;
+const TIME_REF_SLOW = 1200;
+const TIME_REF_RESUME = 600;
+const TIME_REF_TIMER = 200;
 function dealInfoGrp(grpId) {
     var grpInfo = grpData[grpId];
     if (!grpInfo) return;
     console.log(`[DEBUG]${grpInfo.status},time:${grpInfo.maxTime}, ${grpInfo.minTime}`);
     //失去同步状态：(不会触发wait判断)
     currentSec = new Date().getSeconds();
-    if ((grpInfo.status != "unsync" || (currentSec % 5 == 0 && currentSec != lstSec)) && grpInfo.maxTime - grpInfo.minTime > 3000) {
+    if (
+        (grpInfo.status != "unsync" || (currentSec % 5 == 0 && currentSec != lstSec))
+        &&
+        grpInfo.maxTime - grpInfo.minTime > TIME_REF_UNSYNC * (grpInfo.speed || 1)
+    ) {
         lstSec = currentSec;
         grpData[grpId].status = "unsync";
         commandGrp(grpId, {
@@ -77,20 +86,35 @@ function dealInfoGrp(grpId) {
         });
     }
     //当前所有设备均在正常播放
-    if (grpInfo.status == "normal") {
+    if (grpInfo.status == "normal" || grpInfo.status == "slow") {
         //条件：高速度比低速度的设备的进度快了3秒及以上
-        if (grpInfo.maxTime - grpInfo.minTime >= 1200) {
+        if (grpInfo.maxTime - grpInfo.minTime >= TIME_REF_WAIT * (grpInfo.speed || 1)) {
             commandGrp(grpId, {
                 type: "pause",
-                time: grpInfo.maxTime
+                time: grpInfo.maxTime,
+                foru: grpInfo.minUser,
             });
             grpData[grpId].status = "wait";
+        } else if (grpInfo.maxTime - grpInfo.minTime >= TIME_REF_SLOW * (grpInfo.speed || 1)) {
+            commandGrp(grpId, {
+                type: "slow",
+                time: grpInfo.minTime + TIME_REF_TIMER * 2 * (grpInfo.speed || 1),
+            });
+            grpData[grpId].status = "slow"
+        } else if (grpInfo.status == "slow") {
+            //条件：高速度比低速度的设备的进度差距短于1秒
+            if (grpInfo.maxTime - grpInfo.minTime <= TIME_REF_RESUME * (grpInfo.speed || 1)) {
+                commandGrp(grpId, {
+                    type: "noslow"
+                });
+                grpData[grpId].status = "normal";
+            }
         }
     }
     //当前正在等待低进度设备
     else if (grpInfo.status == "wait" || grpInfo.status == "unsync") {
         //条件：高速度比低速度的设备的进度差距短于1秒
-        if (grpInfo.maxTime - grpInfo.minTime <= 600) {
+        if (grpInfo.maxTime - grpInfo.minTime <= TIME_REF_RESUME * (grpInfo.speed || 1)) {
             commandGrp(grpId, {
                 type: "play",
                 time: grpInfo.maxTime
@@ -105,6 +129,7 @@ function updateGrp(grpId, userId, timeStamp) {
     console.log(grpData[grpId].time);
     grpData[grpId].minTime = grpData[grpId].maxTime = timeStamp;
     grpData[grpId].maxUser = userId;
+    grpData[grpId].minUser = userId;
     for (const key in grpData[grpId].time) {
         if (Object.hasOwnProperty.call(grpData[grpId].time, key)) {
             const element = grpData[grpId].time[key];
@@ -114,6 +139,7 @@ function updateGrp(grpId, userId, timeStamp) {
             }
             if (parseInt(grpData[grpId].minTime) > parseInt(element)) {
                 grpData[grpId].minTime = element;
+                grpData[grpId].minUser = key;
             }
         }
     }
@@ -126,12 +152,16 @@ function userGetGrp(userId) {
 function addMenberGrp(grpId, userId) {
     if (!grpTable[grpId]) grpTable[grpId] = [], grpData[grpId] = { time: {}, status: "normal" };
     userGrp[userId] = grpId;
-    grpTable[grpId].push(userId);
+    if (!grpTable[grpId].includes(userId))
+        grpTable[grpId].push(userId);
     //新加入用户同步进度
     let grpTime = grpData[grpId].maxTime;
     if (!grpTime) grpTime = 0;
 
-    commandUser(userId, { type: "init", time: grpTime });
+    commandUser(userId, { type: "init", time: grpTime, play: grpData[grpId].status != "wait", adpMinVer: targetMinVer });
+    if ((grpData[grpId].speed || 1) != 1) {
+        commandUser(userId, { type: "speed", speed: (grpData[grpId].speed || 1) });
+    }
     //广播加入通知
     commandGrp(grpId, { type: "join", user: userId });
 }
@@ -202,8 +232,8 @@ function wsMsg(data, conId) {
             userTrusted[user] = dat.trust;
 
             if (userLastGrpId[user] && dat.title) {
-                if (grpTable[userLastGrpId[user]]) {
-                    commandGrp(userLastGrpId[user], { type: "userJmp", name: user, title: dat.title,url:dat.url});
+                if (grpTable[userLastGrpId[user]] && grpTable[userLastGrpId[user]] != dat.group) {
+                    commandGrp(userLastGrpId[user], { type: "userJmp", name: user, title: dat.title, url: dat.url });
                 }
             }
             userLastGrpId[user] = dat.group;
@@ -254,6 +284,18 @@ function wsMsg(data, conId) {
             break;
         case "delay":
             commandUser(user, { type: "delay" });
+            break;
+        case "speed":
+            var grpId = userGetGrp(user);
+            if (grpData[grpId]) {
+                grpData[grpId].speed = dat.speed;
+                commandGrp(userGetGrp(user), {
+                    type: "speed",
+                    speed: dat.speed,
+                });
+            }
+            break;
+        default:
             break;
     }
 }

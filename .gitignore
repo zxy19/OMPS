@@ -2,3 +2,4 @@
 plugin/layer.html
 server/privkey.pem
 server/fullchain.pem
+server/beta.js
