@@ -3,7 +3,7 @@
 // @namespace    https://xypp.cc/omps/
 // @updateURL    https://xypp.cc/omps/app.js
 // @downloadURL  https://xypp.cc/omps/app.js
-// @version      7.4.0
+// @version      8.0.0
 // @description  OMPS多人在线同播。脚本默认对所有站点均生效。您可以在TamperMonkey=>管理面板=>OMPS多人在线同播=>设置=>用户排除中修改不想要生效的网站或直接修改源代码
 // @author       小鱼飘飘
 // @match        *://*/*
@@ -16,7 +16,7 @@
 
 (function () {
     'use strict';
-    const OMPS_VER = "7.4.0";
+    const OMPS_VER = "8.0.0";
     const DEBUG = false;
     const URL = "wss://public.xypp.cc:8093";
     /**
