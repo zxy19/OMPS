@@ -3,7 +3,7 @@
 // @namespace    https://xypp.cc/omps/
 // @updateURL    https://xypp.cc/omps/app.js
 // @downloadURL  https://xypp.cc/omps/app.js
-// @version      8.0.0
+// @version      8.0.2
 // @description  OMPS多人在线同播。脚本默认对所有站点均生效。您可以在TamperMonkey=>管理面板=>OMPS多人在线同播=>设置=>用户排除中修改不想要生效的网站或直接修改源代码
 // @author       小鱼飘飘
 // @match        *://*/*
@@ -16,7 +16,7 @@
 
 (function () {
     'use strict';
-    const OMPS_VER = "8.0.0";
+    const OMPS_VER = "8.0.2";
     const DEBUG = false;
     const URL = "wss://public.xypp.cc:8093";
     /**
@@ -655,6 +655,7 @@ https://xypp.cc/omps/
             if (!el.parentNode) break;
             if (el.parentNode.offsetWidth == el.offsetWidth && el.parentNode.offsetHeight == el.offsetHeight)
                 el = el.parentNode;
+            else break;
         }
         videoContainEl = el;
         return el;
@@ -1018,6 +1019,12 @@ https://xypp.cc/omps/
             msg: text
         })
     }
+    function hideMsg() {
+        if (msgCtr) {
+            msgCtr.parentNode.removeChild(msgCtr);
+            msgCtr = undefined;
+        }
+    }
     //=======分享URL====================
     function createShare() {
         if (!topUrl && !isTopWindow) {
@@ -1088,7 +1095,7 @@ https://xypp.cc/omps/
             try { toastTipLineMask.parentNode.removeChild(toastTipLineMask) } catch (ignore) { };
         }
         hideFriendList();
-        msgCtr = null;
+        hideMsg();
     }
 
     function createTimer() {//创建视频计时器（200ms）
